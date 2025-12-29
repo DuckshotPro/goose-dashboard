@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🪿 Goose Dashboard</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-orange: #f59e0b;
+            --border-color: #475569;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 2rem;
+            color: var(--accent-blue);
+        }
+
+        .btn {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .session-list {
+            margin-top: 2rem;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .session-item {
+            background: var(--bg-tertiary);
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .session-item:hover {
+            background: var(--accent-blue);
+        }
+
+        /* Main Chat Area */
+        .main {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message {
+            max-width: 70%;
+            padding: 1rem;
+            border-radius: 1rem;
+            word-wrap: break-word;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background: var(--accent-blue);
+            margin-left: auto;
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .message.system {
+            align-self: center;
+            background: var(--bg-tertiary);
+            color: var(--accent-orange);
+            font-size: 0.9rem;
+            max-width: 90%;
+        }
+
+        .message-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .input-area {
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 1rem;
+        }
+
+        .input-area input {
+            flex: 1;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+        }
+
+        .input-area input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .input-area button {
+            background: var(--accent-green);
+            border: none;
+            color: white;
+            padding: 0.75rem 2rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .input-area button:hover {
+            background: #059669;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            margin-right: 0.5rem;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .tab {
+            padding: 0.5rem 1rem;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            color: var(--accent-blue);
+            border-bottom-color: var(--accent-blue);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo">🪿 Goose Dashboard</div>
+            
+            <button class="btn btn-primary" onclick="newSession()">🆕 New Chat</button>
+            <button class="btn" onclick="loadSessions()">🔄 Refresh Sessions</button>
+            <button class="btn" onclick="showExtensions()">🔌 Extensions</button>
+            <button class="btn" onclick="showConfig()">⚙️ Configuration</button>
+            
+            <div class="session-list">
+                <h3 style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9rem;">RECENT SESSIONS</h3>
+                <div id="sessions"></div>
+            </div>
+        </div>
+
+        <!-- Main Area -->
+        <div class="main">
+            <div class="header">
+                <div>
+                    <span class="status-indicator"></span>
+                    <span id="current-session">No session</span>
+                </div>
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('chat')">Chat</button>
+                    <button class="tab" onclick="switchTab('config')">Config</button>
+                    <button class="tab" onclick="switchTab('logs')">Logs</button>
+                </div>
+            </div>
+
+            <!-- Chat Tab -->
+            <div id="chat-tab" class="tab-content active">
+                <div class="chat-container" id="chat-messages">
+                    <div class="message system">
+                        <div class="message-meta">System</div>
+                        🪿 Goose Dashboard is ready! Start a new chat or select a session.
+                    </div>
+                </div>
+
+                <div class="input-area">
+                    <input 
+                        type="text" 
+                        id="message-input" 
+                        placeholder="Type your message to Goose..."
+                        onkeypress="if(event.key==='Enter') sendMessage()"
+                    >
+                    <button onclick="sendMessage()">📤 Send</button>
+                </div>
+            </div>
+
+            <!-- Config Tab -->
+            <div id="config-tab" class="tab-content" style="padding: 2rem;">
+                <h2>Configuration</h2>
+                <p style="color: var(--text-secondary); margin: 1rem 0;">Configure Goose provider and settings</p>
+                
+                <div style="max-width: 600px;">
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 0.5rem;">Provider</label>
+                        <select id="provider" class="btn" style="width: 100%;">
+                            <option value="openai">OpenAI</option>
+                            <option value="anthropic">Anthropic (Claude)</option>
+                            <option value="google">Google (Gemini)</option>
+                            <option value="ollama">Ollama</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 0.5rem;">Model</label>
+                        <input type="text" id="model" placeholder="e.g., gpt-4, claude-sonnet-3-5" style="width: 100%; padding: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 0.5rem; color: var(--text-primary);">
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 0.5rem;">API Key (optional)</label>
+                        <input type="password" id="api-key" placeholder="Leave empty to use environment variable" style="width: 100%; padding: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 0.5rem; color: var(--text-primary);">
+                    </div>
+
+                    <button class="btn btn-primary" onclick="saveConfig()">Save Configuration</button>
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div id="logs-tab" class="tab-content" style="padding: 2rem;">
+                <h2>Activity Logs</h2>
+                <div id="logs" style="background: var(--bg-secondary); padding: 1rem; border-radius: 0.5rem; margin-top: 1rem; font-family: monospace; font-size: 0.85rem; max-height: 500px; overflow-y: auto;">
+                    <!-- Logs will appear here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentSession = 'default';
+
+        // Socket event handlers
+        socket.on('connect', () => {
+            addLog('Connected to Goose server');
+        });
+
+        socket.on('message', (data) => {
+            addMessage(data.role, data.content, data.timestamp);
+        });
+
+        socket.on('partial_response', (data) => {
+            // Could implement streaming here
+        });
+
+        socket.on('error', (data) => {
+            addMessage('system', '❌ Error: ' + data.message);
+        });
+
+        // UI Functions
+        function addMessage(role, content, timestamp = null) {
+            const container = document.getElementById('chat-messages');
+            const msg = document.createElement('div');
+            msg.className = `message ${role}`;
+            
+            const meta = document.createElement('div');
+            meta.className = 'message-meta';
+            meta.textContent = role === 'user' ? 'You' : role === 'assistant' ? '🪿 Goose' : 'System';
+            if (timestamp) {
+                meta.textContent += ' • ' + new Date(timestamp).toLocaleTimeString();
+            }
+            
+            msg.appendChild(meta);
+            msg.appendChild(document.createTextNode(content));
+            container.appendChild(msg);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addLog(message) {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            
+            if (message) {
+                socket.emit('send_message', {
+                    message: message,
+                    session: currentSession
+                });
+                input.value = '';
+                addLog('Sent message to Goose');
+            }
+        }
+
+        function newSession() {
+            const name = prompt('Session name (leave empty for auto-generated):');
+            socket.emit('new_session', { name: name || '' });
+            addLog('Creating new session...');
+        }
+
+        function loadSessions() {
+            fetch('/api/sessions')
+                .then(r => r.json())
+                .then(data => {
+                    const container = document.getElementById('sessions');
+                    container.innerHTML = '';
+                    
+                    data.sessions.forEach(session => {
+                        const div = document.createElement('div');
+                        div.className = 'session-item';
+                        div.textContent = session.name;
+                        div.onclick = () => loadSession(session.name);
+                        container.appendChild(div);
+                    });
+                    
+                    addLog(`Loaded ${data.sessions.length} sessions`);
+                });
+        }
+
+        function loadSession(name) {
+            currentSession = name;
+            document.getElementById('current-session').textContent = name;
+            
+            fetch(`/api/session/${name}/history`)
+                .then(r => r.json())
+                .then(data => {
+                    const container = document.getElementById('chat-messages');
+                    container.innerHTML = '';
+                    
+                    data.messages.forEach(msg => {
+                        addMessage(msg.role, msg.content, msg.timestamp);
+                    });
+                    
+                    addLog(`Loaded session: ${name}`);
+                });
+        }
+
+        function showExtensions() {
+            fetch('/api/extensions')
+                .then(r => r.json())
+                .then(data => {
+                    const msg = data.extensions.map(e => 
+                        `• ${e.name}: ${e.description}`
+                    ).join('\n');
+                    addMessage('system', '🔌 Available Extensions:\n\n' + msg);
+                });
+        }
+
+        function showConfig() {
+            switchTab('config');
+        }
+
+        function saveConfig() {
+            const config = {
+                provider: document.getElementById('provider').value,
+                model: document.getElementById('model').value,
+                api_key: document.getElementById('api-key').value
+            };
+            
+            fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            })
+            .then(r => r.json())
+            .then(data => {
+                addLog('Configuration saved');
+                alert('✅ Configuration saved successfully');
+            });
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add('active');
+            document.getElementById(`${tab}-tab`).classList.add('active');
+        }
+
+        // Load sessions on start
+        loadSessions();
+    </script>
+</body>
+</html>
